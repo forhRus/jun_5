@@ -1,3 +1,5 @@
+import org.w3c.dom.ls.LSOutput;
+
 import java.io.*;
 import java.net.Socket;
 import java.util.ArrayList;
@@ -8,6 +10,7 @@ public class ClientManager implements Runnable {
     private BufferedReader bufferedReader;
     private BufferedWriter bufferedWriter;
     private String name;
+    private static char PRIVATE_SIGN = '@';
 
     public final static ArrayList<ClientManager> clients = new ArrayList<>();
 
@@ -18,8 +21,8 @@ public class ClientManager implements Runnable {
             bufferedReader = new BufferedReader(new InputStreamReader(socket.getInputStream()));
             name = bufferedReader.readLine();
             clients.add(this);
-            System.out.println(name + " подключился к чату.");
-            broadcastMessage("Server: " + name + " подключился к чату.");
+            System.out.println(name + " подключился к чату. (для сервера)"); // Сообщение летит на сервер
+            broadcastMessage("Server",  name + " подключился к чату. (для пользователей)");
         }
         catch (IOException e){
             closeEverything(socket, bufferedReader, bufferedWriter);
@@ -30,17 +33,17 @@ public class ClientManager implements Runnable {
 
     @Override
     public void run() {
-        String massageFromClient;
+        String messageFromClient;
 
         while (socket.isConnected()) {
             try {
-                massageFromClient = bufferedReader.readLine();
-                /*if (massageFromClient == null){
-                    // для  macOS
-                    closeEverything(socket, bufferedReader, bufferedWriter);
-                    break;
-                }*/
-                broadcastMessage(massageFromClient);
+                messageFromClient = bufferedReader.readLine();
+                if(isPrivateMessage(messageFromClient)){
+                    sendPrivateMessage(messageFromClient);
+                }else{
+                    broadcastMessage(name, messageFromClient);
+                }
+
             }
             catch (IOException e){
                 closeEverything(socket, bufferedReader, bufferedWriter);
@@ -49,11 +52,94 @@ public class ClientManager implements Runnable {
         }
     }
 
-    private void broadcastMessage(String message){
+    /*
+    Проверка на наличие приватного знака
+     */
+    private boolean isPrivateMessage(String messageFromClient) {
+        return messageFromClient.trim().charAt(0) == PRIVATE_SIGN;
+    }
+
+    /*
+    Отправка личного сообщения
+     */
+    private void sendPrivateMessage(String message){
+        // кому отсылаем
+        String addressName = getAddressName(message);
+
+        if(addressName != null){
+            // от кого
+            String fromAddress = name;
+            // сообщение без приватного префикса
+            String privateMessage = getMessage(message);
+            // флаг о доставке сообщение
+            boolean isDelivered = false;
+
+            for (ClientManager client: clients) {
+                try {
+                    // если нашли адресат в чате, то отправляем сообщение
+                    if (client.name.toLowerCase().equals(addressName)) {
+                        client.bufferedWriter.write(String.format("private message from %s: %s", fromAddress, privateMessage));
+                        client.bufferedWriter.newLine();
+                        client.bufferedWriter.flush();
+                        // меняем статус отправки
+                        isDelivered = !isDelivered;
+                        break;
+                    }
+                }
+                catch (IOException e){
+                    closeEverything(socket, bufferedReader, bufferedWriter);
+                }
+            }
+            // если адресата нет в чате, то выводим сообщение только пользователю
+            if(!isDelivered)
+                serverAnswer((String.format("Пользователя %s нет в чате", addressName)));
+        }
+    }
+
+    /*
+    для отправки уведомлений пользователю
+     */
+    private void serverAnswer(String answer) {
         for (ClientManager client: clients) {
             try {
-                if (!client.name.equals(name)) {
-                    client.bufferedWriter.write(message);
+                // находим себя
+                if (client.name.equals(name)) {
+                    client.bufferedWriter.write(answer);
+                    client.bufferedWriter.newLine();
+                    client.bufferedWriter.flush();
+                    break;
+                }
+            }
+            catch (IOException e){
+                closeEverything(socket, bufferedReader, bufferedWriter);
+            }
+        }
+    }
+
+    /*
+    Вырезаем имя адресата из сообщения
+     */
+    private String getMessage(String message) {
+        return  message.trim().substring(message.indexOf(" ")).trim();
+    }
+
+    /*
+    Получаем имя пользователя для приватного сообщения,
+    либо null если нету имени или нету сообщения
+     */
+    private String getAddressName(String message) {
+        int index = message.trim().indexOf(" ");
+        if(index > 1){
+            return message.trim().substring(1, index).toLowerCase();
+        }
+        return null;
+    }
+
+    private void broadcastMessage(String from, String message){
+        for (ClientManager client: clients) {
+            try {
+                if (!client.name.equals(from)) {
+                    client.bufferedWriter.write(from + ": " + message);
                     client.bufferedWriter.newLine();
                     client.bufferedWriter.flush();
                 }
@@ -63,7 +149,6 @@ public class ClientManager implements Runnable {
             }
         }
     }
-
 
     private void closeEverything(Socket socket, BufferedReader bufferedReader, BufferedWriter bufferedWriter) {
         // Удаление клиента из коллекции
@@ -89,7 +174,7 @@ public class ClientManager implements Runnable {
     private void removeClient(){
         clients.remove(this);
         System.out.println(name + " покинул чат.");
-        broadcastMessage("Server: " + name + " покинул чат.");
+        broadcastMessage("Server", name + " покинул чат.");
     }
 
 }
