@@ -3,7 +3,6 @@ import java.net.Socket;
 import java.util.Scanner;
 
 public class Client {
-
   private final Socket socket;
   private final String name;
   private BufferedWriter bufferedWriter;
@@ -57,7 +56,8 @@ public class Client {
       Scanner scanner = new Scanner(System.in);
       while (socket.isConnected()) {
         String message = scanner.nextLine();
-        bufferedWriter.write(name + ": " + message);
+//        bufferedWriter.write(name + ": " + message);
+        bufferedWriter.write(message);
         bufferedWriter.newLine();
         bufferedWriter.flush();
       }
