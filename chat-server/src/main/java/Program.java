@@ -7,7 +7,7 @@ public class Program {
     public static void main(String[] args) {
         try
         {
-            ServerSocket serverSocket = new ServerSocket(1400);
+            ServerSocket serverSocket = new ServerSocket(1500);
             Server server = new Server(serverSocket);
             server.runServer();
         }
