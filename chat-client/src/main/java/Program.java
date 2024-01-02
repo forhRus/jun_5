@@ -1,10 +1,10 @@
 import java.io.IOException;
-import java.net.InetAddress;
 import java.net.Socket;
 import java.rmi.UnknownHostException;
 import java.util.Scanner;
 
 public class Program {
+  private static int count = 0;
 
   public static void main(String[] args) {
     try {
@@ -12,13 +12,14 @@ public class Program {
       System.out.print("Введите своё имя: ");
       // Укажем свое имя
       String name = scanner.nextLine();
-      Socket socket = new Socket("localhost", 1400);
+      if(name.length() == 0) name = "quest_" + ++count;
+      Socket socket = new Socket("localhost", 1500);
       Client client = new Client(socket, name);
-      InetAddress inetAddress = socket.getInetAddress();
-      System.out.println("InetAddress: " + inetAddress);
-      String remoteIp = inetAddress.getHostAddress();
-      System.out.println("Remote IP: " + remoteIp);
-      System.out.println("LocalPort:" + socket.getLocalPort());
+//      InetAddress inetAddress = socket.getInetAddress();
+//      System.out.println("InetAddress: " + inetAddress);
+//      String remoteIp = inetAddress.getHostAddress();
+//      System.out.println("Remote IP: " + remoteIp);
+//      System.out.println("LocalPort:" + socket.getLocalPort());
 
       client.listenForMessage();
       client.sendMessage();
